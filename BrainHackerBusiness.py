@@ -26,7 +26,7 @@ TELEGRAM_CHAT_ID = "8911535763"
 
 # --- GITHUB AUTO UPDATE CONFIG ---
 CURRENT_VERSION = "1.0.1"
-VERSION_CHECK_URL = "https://raw.githubusercontent.com/prashanmliyanage/enterprise-updates/main/version.json"
+VERSION_CHECK_URL = "https://raw.githubusercontent.com/prashanmliyanage-create/enterprise-updates/main/version.json"
 
 def send_telegram_alert(message):
     try:
