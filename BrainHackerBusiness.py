@@ -13,9 +13,8 @@ import urllib.request
 import time
 import ssl
 import hashlib
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import sys
+import webbrowser
 
 # --- THEME & APPEARANCE SETUP ---
 ctk.set_appearance_mode("Dark")
@@ -24,9 +23,9 @@ ctk.set_default_color_theme("blue")
 TELEGRAM_BOT_TOKEN = "8959101549:AAGHPAAbg2IhlXwEZ_dVMeBgHzOXX9ngywc"
 TELEGRAM_CHAT_ID = "8911535763"
 
-# --- GITHUB AUTO UPDATE CONFIG ---
+# --- VERSION CONFIG ---
 CURRENT_VERSION = "1.3.0"
-VERSION_CHECK_URL = "https://raw.githubusercontent.com/prashanmliyanage-create/enterprise-updates/main/version.json"
+VERSION_CHECK_URL = "https://raw.githubusercontent.com/prashanmliyanage-create/enterprise-updates/refs/heads/main/version.json"
 
 def send_telegram_alert(message):
     try:
@@ -40,11 +39,6 @@ def send_telegram_alert(message):
 def send_email_alert(subject, body, to_email="admin@enterprise.local"):
     try:
         sender_email = "enterprise.vault.alert@gmail.com"
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = to_email
-        msg['Subject'] = f"[ENTERPRISE SIEM] {subject}"
-        msg.attach(MIMEText(body, 'plain'))
         print(f"Email Dispatch Simulated to {to_email}: {subject}")
     except Exception as e:
         print(f"Email Alert Failed: {e}")
@@ -150,7 +144,6 @@ class EnterpriseSecurityApp(ctk.CTk):
                 self.create_widgets()
                 self.start_live_telemetry()
                 self.start_background_cron_job()
-                self.check_for_updates(manual=False)
             else:
                 messagebox.showerror("Access Denied", "Invalid Username or Password!")
                 log_to_database("LOGIN_FAILURE", f"Failed login attempt with username: '{user}'")
@@ -183,7 +176,7 @@ class EnterpriseSecurityApp(ctk.CTk):
             ("🔍 SIEM System Audit", self.enterprise_system_audit, "#10b981"),
             ("📊 Export PDF / CSV Report", self.export_enterprise_report, "#8b5cf6"),
             ("📈 Live Analytics Stream", self.open_analytics_window, "#0d9488"),
-            ("🔄 Check GitHub Updates", self.manual_check_updates, "#f59e0b"),
+            ("🔄 Check GitHub Updates", self.check_github_updates_popup, "#f59e0b"),
             ("🧹 Clear Console Log", self.clear_console, "#64748b"),
             ("🛑 Emergency Shutdown", self.quit_application, "#ef4444"),
             
@@ -246,7 +239,7 @@ class EnterpriseSecurityApp(ctk.CTk):
 
         self.output_box.insert("0.0", f"[ MASTER ENTERPRISE SECURITY CONSOLE - v{CURRENT_VERSION} ]\n")
         self.output_box.insert("end", f"[+] Logged in as: {self.current_user} [{self.current_role}]\n")
-        self.output_box.insert("end", "[+] GitHub Auto-Updater & Modules Initialized Successfully.\n\n")
+        self.output_box.insert("end", "[+] Core Modules Initialized Successfully.\n\n")
 
         self.footer_frame = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=0, height=35)
         self.footer_frame.pack(fill="x", side="bottom")
@@ -254,49 +247,55 @@ class EnterpriseSecurityApp(ctk.CTk):
         self.signature_lbl = ctk.CTkLabel(self.footer_frame, text="Designed & Developed by: PRASHAN. M. LIYANAGE  |  Contact: +94761258498", font=ctk.CTkFont(family="Brush Script MT", size=14, weight="bold"), text_color="#38bdf8")
         self.signature_lbl.pack(side="right", padx=20)
 
-    def check_for_updates(self, manual=False):
-        def task():
+    def check_github_updates_popup(self):
+        update_win = ctk.CTkToplevel(self)
+        update_win.title("Software Update Center")
+        update_win.geometry("440x300")
+        update_win.resizable(False, False)
+        update_win.grab_set()
+
+        ctk.CTkLabel(update_win, text="🔄 Software Update Center", font=ctk.CTkFont(family="Consolas", size=16, weight="bold"), text_color="#38bdf8").pack(pady=(25, 10))
+        
+        status_label = ctk.CTkLabel(update_win, text="Checking GitHub for the latest version...", font=ctk.CTkFont(family="Consolas", size=12), text_color="#cbd5e1")
+        status_label.pack(pady=10)
+
+        progress_bar = ctk.CTkProgressBar(update_win, mode="indeterminate", width=340)
+        progress_bar.pack(pady=15)
+        progress_bar.start()
+
+        def fetch_update():
             try:
-                if manual:
-                    self.after(0, lambda: self.output_box.insert("end", "[*] [UPDATER] Checking GitHub repository for updates...\n"))
-                
                 req = urllib.request.Request(VERSION_CHECK_URL, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=5) as response:
                     data = json.loads(response.read().decode())
-                    remote_version = data.get("version")
-                    update_url = data.get("update_url")
-                    
-                if remote_version and remote_version != CURRENT_VERSION:
-                    msg = f"A new version ({remote_version}) is available on GitHub!\nDo you want to download and install it now?"
-                    self.after(0, lambda: self.show_update_dialog(msg, update_url))
-                else:
-                    if manual:
-                        self.after(0, lambda: self.output_box.insert("end", "[+] [UPDATER] You are already using the latest version.\n\n"))
-                        self.after(0, lambda: messagebox.showinfo("Up to Date", "Your software is up to date!"))
+                    latest_version = data.get("version")
+                    download_url = data.get("script_url", "https://github.com/prashanmliyanage-create/enterprise-updates")
+
+                    update_win.after(0, lambda: show_update_result(latest_version, download_url))
             except Exception as e:
-                if manual:
-                    self.after(0, lambda: self.output_box.insert("end", f"[-] [UPDATER] Failed to check GitHub updates: {e}\n\n"))
-                    self.after(0, lambda: messagebox.showerror("Connection Error", f"Could not reach GitHub update server: {e}"))
+                update_win.after(0, lambda: show_update_error(str(e)))
 
-        threading.Thread(target=task, daemon=True).start()
+        def show_update_result(latest_version, download_url):
+            progress_bar.stop()
+            progress_bar.pack_forget()
 
-    def manual_check_updates(self):
-        self.output_box.insert("end", "[*] [UPDATER] Manual check requested...\n")
-        self.check_for_updates(manual=True)
+            if latest_version and latest_version != CURRENT_VERSION:
+                status_label.configure(text=f"New version (v{latest_version}) is available!", text_color="#34d399")
+                
+                info_text = ctk.CTkLabel(update_win, text=f"Your current version is v{CURRENT_VERSION}.\nPlease download the latest update from GitHub.", font=ctk.CTkFont(family="Consolas", size=11), text_color="#94a3b8")
+                info_text.pack(pady=5)
 
-    def show_update_dialog(self, msg, update_url):
-        answer = messagebox.askyesno("Software Update Available", msg)
-        if answer:
-            self.download_and_apply_update(update_url)
+                dl_btn = ctk.CTkButton(update_win, text="Open Download Link in Browser", fg_color="#0284c7", hover_color="#0369a1", command=lambda: webbrowser.open(download_url))
+                dl_btn.pack(pady=15)
+            else:
+                status_label.configure(text=f"You are running the latest version\n(v{CURRENT_VERSION}). No updates found.", text_color="#34d399")
 
-    def download_and_apply_update(self, update_url):
-        def task():
-            self.output_box.insert("end", "[*] [UPDATER] Downloading update from GitHub...\n")
-            time.sleep(1.5)
-            self.output_box.insert("end", "[+] [UPDATER] Update patch downloaded and applied successfully! Please restart.\n\n")
-            messagebox.showinfo("Update Complete", "The update has been successfully applied. Please restart the application.")
-            log_to_database("SOFTWARE_UPDATE", f"Updated from v{CURRENT_VERSION} via GitHub repository.")
-        threading.Thread(target=task, daemon=True).start()
+        def show_update_error(err):
+            progress_bar.stop()
+            progress_bar.pack_forget()
+            status_label.configure(text=f"Could not connect to update server.\n(Check internet connection)", text_color="#ef4444")
+
+        threading.Thread(target=fetch_update, daemon=True).start()
 
     def start_live_telemetry(self):
         def telemetry_loop():
@@ -320,7 +319,7 @@ class EnterpriseSecurityApp(ctk.CTk):
 
                     cpu = psutil.cpu_percent(interval=None)
                     ram = psutil.virtual_memory().percent
-                    disk = psutil.disk_usage(os.path.abspath('/')).percent
+                    disk = psutil.disk_usage('/').percent
                     gpu = min(100.0, max(5.0, cpu + (hash(str(current_time)) % 15 - 7)))
 
                     dl_str = f"{dl_speed:.1f} KB/s" if dl_speed < 1024 else f"{dl_speed/1024:.2f} MB/s"
@@ -388,7 +387,7 @@ class EnterpriseSecurityApp(ctk.CTk):
             self.output_box.insert("end", "[*] [SIEM AUDIT] Analyzing system resource allocation...\n")
             cpu = psutil.cpu_percent(interval=1)
             ram = psutil.virtual_memory().percent
-            disk = psutil.disk_usage(os.path.abspath('/')).percent
+            disk = psutil.disk_usage('/').percent
             self.output_box.insert("end", f"  [i] CPU Utilization: {cpu}%\n  [i] RAM Usage: {ram}%\n  [i] Disk Allocation: {disk}%\n")
             self.output_box.insert("end", "[+] [SIEM] System audit completed successfully.\n\n")
             log_to_database("SYSTEM_AUDIT", f"CPU: {cpu}%, RAM: {ram}%")
