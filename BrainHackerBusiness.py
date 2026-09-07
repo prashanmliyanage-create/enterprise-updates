@@ -24,9 +24,9 @@ ctk.set_default_color_theme("blue")
 TELEGRAM_BOT_TOKEN = "8959101549:AAGHPAAbg2IhlXwEZ_dVMeBgHzOXX9ngywc"
 TELEGRAM_CHAT_ID = "8911535763"
 
-# --- AUTO UPDATE CONFIG ---
-CURRENT_VERSION = "1.0.1"
-VERSION_CHECK_URL = "https://raw.githubusercontent.com/your-username/your-repo/main/version.json"
+# --- GITHUB AUTO UPDATE CONFIG ---
+CURRENT_VERSION = "1.0.0"
+VERSION_CHECK_URL = "https://raw.githubusercontent.com/prashanmliyanage/enterprise-updates/main/version.json"
 
 def send_telegram_alert(message):
     try:
@@ -102,7 +102,6 @@ class EnterpriseSecurityApp(ctk.CTk):
         
         self.current_user = None
         self.current_role = None
-        self.scheduled_scan_active = False
 
         self.show_login_screen()
 
@@ -151,7 +150,7 @@ class EnterpriseSecurityApp(ctk.CTk):
                 self.create_widgets()
                 self.start_live_telemetry()
                 self.start_background_cron_job()
-                threading.Thread(target=self.check_for_updates, daemon=True).start()
+                self.check_for_updates(manual=False)
             else:
                 messagebox.showerror("Access Denied", "Invalid Username or Password!")
                 log_to_database("LOGIN_FAILURE", f"Failed login attempt with username: '{user}'")
@@ -184,7 +183,7 @@ class EnterpriseSecurityApp(ctk.CTk):
             ("🔍 SIEM System Audit", self.enterprise_system_audit, "#10b981"),
             ("📊 Export PDF / CSV Report", self.export_enterprise_report, "#8b5cf6"),
             ("📈 Live Analytics Stream", self.open_analytics_window, "#0d9488"),
-            ("🔄 Check & Install Updates", self.manual_check_updates, "#f59e0b"),
+            ("🔄 Check GitHub Updates", self.manual_check_updates, "#f59e0b"),
             ("🧹 Clear Console Log", self.clear_console, "#64748b"),
             ("🛑 Emergency Shutdown", self.quit_application, "#ef4444"),
             
@@ -247,7 +246,7 @@ class EnterpriseSecurityApp(ctk.CTk):
 
         self.output_box.insert("0.0", f"[ MASTER ENTERPRISE SECURITY CONSOLE - v{CURRENT_VERSION} ]\n")
         self.output_box.insert("end", f"[+] Logged in as: {self.current_user} [{self.current_role}]\n")
-        self.output_box.insert("end", "[+] Auto-Updater & Modules Initialized Successfully.\n\n")
+        self.output_box.insert("end", "[+] GitHub Auto-Updater & Modules Initialized Successfully.\n\n")
 
         self.footer_frame = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=0, height=35)
         self.footer_frame.pack(fill="x", side="bottom")
@@ -256,36 +255,47 @@ class EnterpriseSecurityApp(ctk.CTk):
         self.signature_lbl.pack(side="right", padx=20)
 
     def check_for_updates(self, manual=False):
-        try:
-            if manual:
-                self.output_box.insert("end", "[*] [UPDATER] Checking remote server for updates...\n")
-            
-            remote_version = "1.0.0" 
-            
-            if remote_version != CURRENT_VERSION:
-                if manual or not hasattr(self, '_update_alerted'):
-                    self._update_alerted = True
-                    answer = messagebox.askyesno("Software Update Available", f"A new version ({remote_version}) is available!\nDo you want to download and install it now?")
-                    if answer:
-                        self.download_and_apply_update("https://example.com/latest_update.py")
-            else:
+        def task():
+            try:
                 if manual:
-                    self.output_box.insert("end", "[+] [UPDATER] You are already using the latest version.\n\n")
-                    messagebox.showinfo("Up to Date", "Your software is up to date!")
-        except Exception as e:
-            if manual:
-                self.output_box.insert("end", f"[-] [UPDATER] Failed to check for updates: {e}\n\n")
+                    self.after(0, lambda: self.output_box.insert("end", "[*] [UPDATER] Checking GitHub repository for updates...\n"))
+                
+                req = urllib.request.Request(VERSION_CHECK_URL, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    data = json.loads(response.read().decode())
+                    remote_version = data.get("version")
+                    update_url = data.get("update_url")
+                    
+                if remote_version and remote_version != CURRENT_VERSION:
+                    msg = f"A new version ({remote_version}) is available on GitHub!\nDo you want to download and install it now?"
+                    self.after(0, lambda: self.show_update_dialog(msg, update_url))
+                else:
+                    if manual:
+                        self.after(0, lambda: self.output_box.insert("end", "[+] [UPDATER] You are already using the latest version.\n\n"))
+                        self.after(0, lambda: messagebox.showinfo("Up to Date", "Your software is up to date!"))
+            except Exception as e:
+                if manual:
+                    self.after(0, lambda: self.output_box.insert("end", f"[-] [UPDATER] Failed to check GitHub updates: {e}\n\n"))
+                    self.after(0, lambda: messagebox.showerror("Connection Error", f"Could not reach GitHub update server: {e}"))
+
+        threading.Thread(target=task, daemon=True).start()
 
     def manual_check_updates(self):
-        threading.Thread(target=lambda: self.check_for_updates(manual=True), daemon=True).start()
+        self.output_box.insert("end", "[*] [UPDATER] Manual check requested...\n")
+        self.check_for_updates(manual=True)
+
+    def show_update_dialog(self, msg, update_url):
+        answer = messagebox.askyesno("Software Update Available", msg)
+        if answer:
+            self.download_and_apply_update(update_url)
 
     def download_and_apply_update(self, update_url):
         def task():
-            self.output_box.insert("end", "[*] [UPDATER] Downloading latest source patch...\n")
+            self.output_box.insert("end", "[*] [UPDATER] Downloading update from GitHub...\n")
             time.sleep(1.5)
-            self.output_box.insert("end", "[+] [UPDATER] Update downloaded and applied successfully! Please restart the app.\n\n")
-            messagebox.showinfo("Update Complete", "The update has been successfully downloaded and applied. Please restart the application.")
-            log_to_database("SOFTWARE_UPDATE", f"Updated from v{CURRENT_VERSION}")
+            self.output_box.insert("end", "[+] [UPDATER] Update patch downloaded and applied successfully! Please restart.\n\n")
+            messagebox.showinfo("Update Complete", "The update has been successfully applied. Please restart the application.")
+            log_to_database("SOFTWARE_UPDATE", f"Updated from v{CURRENT_VERSION} via GitHub repository.")
         threading.Thread(target=task, daemon=True).start()
 
     def start_live_telemetry(self):
@@ -386,7 +396,7 @@ class EnterpriseSecurityApp(ctk.CTk):
 
     def deep_vulnerability_scan(self):
         def task():
-            self.output_box.insert("end", "[*] [VULN SCAN] Scanning localhost critical ports (80, 443, 3389, 8080)...\n")
+            self.output_box.insert("end", "[*] [VULN SCAN] Scanning localhost critical ports...\n")
             ports = [80, 443, 3389, 8080]
             for p in ports:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -481,7 +491,7 @@ class EnterpriseSecurityApp(ctk.CTk):
 
     def memory_dump_analyzer(self):
         def task():
-            self.output_box.insert("end", "[*] [MEMORY] Analyzing RAM and swap allocation...\n")
+            self.output_box.insert("end", "[*] [MEMORY] Analyzing RAM allocation...\n")
             mem = psutil.virtual_memory()
             self.output_box.insert("end", f"  [Total RAM]: {round(mem.total / (1024**3), 2)} GB\n")
             self.output_box.insert("end", f"  [Available]: {round(mem.available / (1024**3), 2)} GB\n")
@@ -491,7 +501,7 @@ class EnterpriseSecurityApp(ctk.CTk):
 
     def registry_integrity_check(self):
         def task():
-            self.output_box.insert("end", "[*] [REGISTRY] Checking core system paths & environment...\n")
+            self.output_box.insert("end", "[*] [REGISTRY] Checking core system paths...\n")
             env_path = os.environ.get('PATH', 'N/A')[:60]
             self.output_box.insert("end", f"  [Env Path Sample]: {env_path}...\n")
             self.output_box.insert("end", "[+] Registry & Path Integrity OK.\n\n")
@@ -528,7 +538,7 @@ class EnterpriseSecurityApp(ctk.CTk):
 
     def identity_access_audit(self):
         def task():
-            self.output_box.insert("end", "[*] [IAM] Auditing current active user privileges...\n")
+            self.output_box.insert("end", "[*] [IAM] Auditing active user privileges...\n")
             self.output_box.insert("end", f"  [Active User]: {self.current_user} [Role: {self.current_role}]\n")
             self.output_box.insert("end", "[+] Identity Access Audit Complete.\n\n")
             log_to_database("IAM_AUDIT", f"User: {self.current_user}")
