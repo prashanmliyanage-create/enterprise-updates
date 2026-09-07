@@ -25,7 +25,7 @@ TELEGRAM_BOT_TOKEN = "8959101549:AAGHPAAbg2IhlXwEZ_dVMeBgHzOXX9ngywc"
 TELEGRAM_CHAT_ID = "8911535763"
 
 # --- AUTO UPDATE CONFIG ---
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "1.0.1"
 VERSION_CHECK_URL = "https://raw.githubusercontent.com/your-username/your-repo/main/version.json"
 
 def send_telegram_alert(message):
