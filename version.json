@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
-  "download_url": "https://raw.githubusercontent.com/prashanmliyanage-create/enterprise-updates/main/app_v1.0.1.exe",
-  "release_notes": "Added new security patches and fixed bugs."
+  "version": "1.0.0",
+  "update_url": "https://github.com/prashanmliyanage/enterprise-updates/raw/main/update.py",
+  "release_notes": "Initial enterprise security release."
 }
