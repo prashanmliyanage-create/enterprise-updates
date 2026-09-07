@@ -320,7 +320,7 @@ class EnterpriseSecurityApp(ctk.CTk):
 
                     cpu = psutil.cpu_percent(interval=None)
                     ram = psutil.virtual_memory().percent
-                    disk = psutil.disk_usage('/').percent
+                    disk = psutil.disk_usage(os.path.abspath('/')).percent
                     gpu = min(100.0, max(5.0, cpu + (hash(str(current_time)) % 15 - 7)))
 
                     dl_str = f"{dl_speed:.1f} KB/s" if dl_speed < 1024 else f"{dl_speed/1024:.2f} MB/s"
@@ -388,7 +388,7 @@ class EnterpriseSecurityApp(ctk.CTk):
             self.output_box.insert("end", "[*] [SIEM AUDIT] Analyzing system resource allocation...\n")
             cpu = psutil.cpu_percent(interval=1)
             ram = psutil.virtual_memory().percent
-            disk = psutil.disk_usage('/').percent
+            disk = psutil.disk_usage(os.path.abspath('/')).percent
             self.output_box.insert("end", f"  [i] CPU Utilization: {cpu}%\n  [i] RAM Usage: {ram}%\n  [i] Disk Allocation: {disk}%\n")
             self.output_box.insert("end", "[+] [SIEM] System audit completed successfully.\n\n")
             log_to_database("SYSTEM_AUDIT", f"CPU: {cpu}%, RAM: {ram}%")
